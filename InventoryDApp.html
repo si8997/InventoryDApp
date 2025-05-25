@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Inventory DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.9.0/dist/web3.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+    }
+    h2 {
+      font-size: 24px;
+      color: #333;
+    }
+    h3 {
+      margin-top: 25px;
+      font-size: 18px;
+      color: #444;
+    }
+    input {
+      margin: 5px 5px 5px 0;
+      padding: 5px;
+      width: 150px;
+    }
+    button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    p, li {
+      font-size: 14px;
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <h2>📦 Inventory DApp</h2>
+  <div class="section">
+    <p>📿 현재 계정: <span id="account">-</span></p>
+    <p>👑 컨트랙트 소유자: <span id="owner">-</span></p>
+    <p>📦 총 상품 수: <span id="productCount">-</span></p>
+  </div>
+
+  <div id="adminSection" style="display: none;">
+    <div class="section">
+      <h3>➕ 상품 추가 (관리자만)</h3>
+      <input id="name" placeholder="상품명" />
+      <input id="price" type="number" placeholder="가격" />
+      <input id="quantity" type="number" placeholder="수량" />
+      <button onclick="addProduct()">상품 추가</button>
+      <p id="addStatus"></p>
+    </div>
+
+    <div class="section">
+      <h3>📀 재고 수정 (관리자만)</h3>
+      <input id="updateId" type="number" placeholder="ID" />
+      <input id="newQty" type="number" placeholder="수량" />
+      <button onclick="updateStock()">수정</button>
+      <p id="updateStatus"></p>
+    </div>
+
+    <div class="section">
+      <h3>🗑️ 상품 삭제 (관리자만)</h3>
+      <input id="deleteId" type="number" placeholder="삭제할 상품 ID" />
+      <button onclick="deleteProduct()">삭제</button>
+      <p id="deleteStatus"></p>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>📊 상품 조회</h3>
+    <input id="productId" type="number" placeholder="상품 ID" />
+    <button onclick="getProduct()">조회</button>
+    <p id="productInfo"></p>
+  </div>
+
+  <div class="section">
+    <h3>📦 전체 상품 목록</h3>
+    <button onclick="getAllProducts()">전체 조회</button>
+    <table id="productTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>이름</th>
+          <th>가격</th>
+          <th>수량</th>
+        </tr>
+      </thead>
+      <tbody id="productList"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let web3;
+    let contract;
+    let currentAccount;
+
+    const contractAddress = "0x9f4065268c6A749A4febb90F6c1c75Ebc7B99813";
+    const abi = [
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_price",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_quantity",
+				"type": "uint256"
+			}
+		],
+		"name": "addProduct",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_productId",
+				"type": "uint256"
+			}
+		],
+		"name": "deleteProduct",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_productId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_newQty",
+				"type": "uint256"
+			}
+		],
+		"name": "updateStock",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getAllProducts",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "",
+				"type": "string[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bool[]",
+				"name": "",
+				"type": "bool[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_productId",
+				"type": "uint256"
+			}
+		],
+		"name": "getProduct",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "productCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "products",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "quantity",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]; // 여기에 실제 ABI 배열 삽입
+
+    async function init() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        contract = new web3.eth.Contract(abi, contractAddress);
+        await updateAccount();
+
+        window.ethereum.on("accountsChanged", async function () {
+          await updateAccount();
+        });
+      } else {
+        alert("MetaMask를 설치해주세요.");
+      }
+    }
+
+    async function updateAccount() {
+      const accounts = await web3.eth.getAccounts();
+      currentAccount = accounts[0];
+      document.getElementById("account").innerText = currentAccount;
+
+      const owner = await contract.methods.owner().call();
+      document.getElementById("owner").innerText = owner;
+
+      const count = await contract.methods.productCount().call();
+      document.getElementById("productCount").innerText = count;
+
+      const isOwner = currentAccount && currentAccount.toLowerCase() === owner.toLowerCase();
+      document.getElementById("adminSection").style.display = isOwner ? "block" : "none";
+    }
+
+    async function addProduct() {
+      const name = document.getElementById("name").value;
+      const price = document.getElementById("price").value;
+      const qty = document.getElementById("quantity").value;
+
+      try {
+        await contract.methods.addProduct(name, price, qty).send({ from: currentAccount });
+        document.getElementById("addStatus").innerText = "✅ 상품 추가 성공";
+        await updateAccount();
+      } catch (err) {
+        document.getElementById("addStatus").innerText = "❌ 실패: " + err.message;
+      }
+    }
+
+    async function updateStock() {
+      const id = document.getElementById("updateId").value;
+      const qty = document.getElementById("newQty").value;
+
+      try {
+        await contract.methods.updateStock(id, qty).send({ from: currentAccount });
+        document.getElementById("updateStatus").innerText = "✅ 재고 수정 완료";
+      } catch (err) {
+        document.getElementById("updateStatus").innerText = "❌ 수정 실패: " + err.message;
+      }
+    }
+
+    async function deleteProduct() {
+      const id = document.getElementById("deleteId").value;
+      try {
+        await contract.methods.deleteProduct(id).send({ from: currentAccount });
+        document.getElementById("deleteStatus").innerText = "✅ 삭제 완료";
+        await updateAccount();
+      } catch (err) {
+        document.getElementById("deleteStatus").innerText = "❌ 삭제 실패: " + err.message;
+      }
+    }
+
+    async function getProduct() {
+      const id = document.getElementById("productId").value;
+
+      try {
+        const result = await contract.methods.getProduct(id).call();
+        document.getElementById("productInfo").innerText =
+          `상품명: ${result[0]}, 가격: ${result[1]}, 수량: ${result[2]}`;
+      } catch (err) {
+        document.getElementById("productInfo").innerText = "❌ 조회 실패: " + err.message;
+      }
+    }
+
+    async function getAllProducts() {
+      try {
+        const result = await contract.methods.getAllProducts().call();
+        const ids = result[0];
+        const names = result[1];
+        const prices = result[2];
+        const quantities = result[3];
+        const existFlags = result[4];
+
+        const list = document.getElementById("productList");
+        const table = document.getElementById("productTable");
+        list.innerHTML = "";
+
+        let hasData = false;
+        for (let i = 0; i < ids.length; i++) {
+          if (!existFlags[i]) continue;
+          hasData = true;
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${ids[i]}</td>
+            <td>${names[i]}</td>
+            <td>${prices[i]}</td>
+            <td>${quantities[i]}</td>
+          `;
+          list.appendChild(row);
+        }
+        table.style.display = hasData ? "table" : "none";
+      } catch (err) {
+        alert("❌ 전체 조회 실패: " + err.message);
+      }
+    }
+
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>
