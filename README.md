@@ -28,12 +28,14 @@
 
 ## 🛠️ 프로젝트 구조
 
+```
 project-root/
 │
 ├─ Inventory.sol # 스마트 컨트랙트
 ├─ index.html # Web DApp (프론트엔드)
 ├─ README.md # 프로젝트 설명 파일
 └─ /screenshots # 주요 화면 캡처 (선택)
+```
 
 ---
 
